@@ -1,0 +1,47 @@
+name: Node.js CI
+
+# 触发条件：在向 master 或 main 分支 push 或提 PR 时触发
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-and-test:
+    # 运行在最新的 Ubuntu 系统上
+    runs-on: ubuntu-latest
+
+    # 定义一个环境变量，给跑测试用的（比如 mock 的 API Key）
+    env:
+      DASHSCOPE_API_KEY: "sk-test-mock-key"
+      NODE_ENV: test
+
+    steps:
+    # 1. 检出你的代码
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. 配置 Node.js 环境，并开启 npm 缓存加速
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'     # 推荐使用 LTS 版本（16/18/20）
+        cache: 'npm'           # 自动缓存 node_modules
+
+    # 3. 安装依赖 (使用 npm ci 比 npm install 更快更严格)
+    - name: Install dependencies
+      run: npm ci
+
+    # 4. 运行 TypeScript 类型检查 (核心步骤)
+    # --noEmit 意思是只检查类型，不生成 JS 文件
+    - name: Type check
+      run: npx tsc --noEmit
+
+    # 5. 运行测试 (如果你配了测试框架如 Vitest / Jest)
+    - name: Run tests
+      run: npm test
+
+    # 6. 构建项目 (如果要把 TS 编译成 JS 发布)
+    # - name: Build project
+    #   run: npm run build

@@ -40,6 +40,9 @@ jobs:
 
     # 5. 运行测试 (如果你配了测试框架如 Vitest / Jest)
     - name: Run tests
+      env:
+        # 左侧是你代码里读取的环境变量名，右侧是 GitHub Secret 名
+        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }} 
       run: npm test
 
     # 6. 构建项目 (如果要把 TS 编译成 JS 发布)

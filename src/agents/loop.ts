@@ -55,8 +55,6 @@ type DeltaToolCall = ChatCompletionChunk.Choice.Delta.ToolCall;
 export class AgentLoop {
 
     private name: string // 模型名称
-    private apiKey: string // api key，这里是密钥名称，实际值在.env文件中
-    private baseUrl: string // 模型提供商的URL
     private model: OpenAI // openai实例
     private mcpClient?: Client // mcp客户端实例，用于调用工具
     private tools: UnifiedTool[] // 统一规范的tool数组
@@ -67,25 +65,14 @@ export class AgentLoop {
     /**
      * 构造函数
      * @param {string} model 模型名称
-     * @param {string} apiKey api key，这里是密钥名称，实际值在.env文件中
-     * @param {string} baseUrl 模型提供商的URL
+     * @param {OpenAI} client openai实例
      * @param {Client} mcpClient mcp客户端实例，用于调用工具
      * @param {AdapterInput[]} functionTools 函数工具数组
      */
-    private constructor(model: string, apiKey: string, baseUrl: string, mcpClient?: Client, functionTools?: AdapterInput[]) {
+    private constructor(model: string, client: OpenAI, mcpClient?: Client, functionTools?: AdapterInput[]) {
         this.name = model
-        this.apiKey = apiKey
-        this.baseUrl = baseUrl
         try {
-            this.model = new OpenAI({
-                // 在环境变量中取出对应的变量
-                apiKey: process.env[this.apiKey],
-                baseURL: this.baseUrl,
-                // 默认超时时间10秒
-                timeout: 10000,
-                // 默认重试次数3次
-                maxRetries: 3,
-            })
+            this.model = client
             // 初始化tools数组
             this.tools = []
 
@@ -95,8 +82,7 @@ export class AgentLoop {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
-            throw new Error(`Failed to create OpenAI instance for model ${model}.
-                message: ${errorMessage}`
+            throw new Error(`unexpected error: ${errorMessage}`
             )
         }
     }
@@ -107,15 +93,14 @@ export class AgentLoop {
     /**
      * 创建代理循环实例
      * @param {string} model 模型名称
-     * @param {string} apiKey api key，这里是密钥名称，实际值在.env文件中
-     * @param {string} baseUrl 模型提供商的URL
+     * @param {OpenAI} client openai实例
      * @param {Client} mcpClient mcp客户端实例，用于调用工具
      * @param {AdapterInput[]} functionTools 函数工具数组
      * @returns {AgentLoop} 代理循环实例
      */
-    static async create(model: string, apiKey: string, baseUrl: string, mcpClient?: Client, functionTools: AdapterInput[] = TOOLS): Promise<AgentLoop> {
+    static async create(model: string, client: OpenAI, mcpClient?: Client, functionTools: AdapterInput[] = TOOLS): Promise<AgentLoop> {
 
-        const agent = new AgentLoop(model, apiKey, baseUrl, mcpClient, functionTools)
+        const agent = new AgentLoop(model, client, mcpClient, functionTools)
         // 如果mcp客户端不为undefined，提取tools数组
         if (mcpClient) {
             // 初始化mcp客户端实例
@@ -187,8 +172,9 @@ export class AgentLoop {
                     finish_reason = chunk?.choices?.[0]?.finish_reason
                 }
             }
-            if (finish_reason === "stop") {
+            if (finish_reason === "stop" || finish_reason === '') {
                 // 如果finish_reason是stop，说明模型输出了完整结果，结束循环
+                // finish_reason===''是测试情况，正常输出并退出
                 // 输出换行符
                 process.stdout.write("\n");
                 // 更新消息列表
